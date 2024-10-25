@@ -7,7 +7,7 @@ from .views import (
     PostMeRetrieveUpdateDestroyView,
 )
 
-from solidaire_api.comment.views import _____
+from solidaire_api.comment.views import CommentListView
 
 urlpatterns = [
     path("", PostListCreateView.as_view()),
@@ -16,6 +16,6 @@ urlpatterns = [
     path("<int:pk>/", PostRetrieveView.as_view()),
     path("me/<uuid:uuid>/", PostMeRetrieveUpdateDestroyView.as_view(lookup_field="uuid")),
     path("me/<int:pk>/", PostMeRetrieveUpdateDestroyView.as_view()),
-    path("<uuid:uuid>/comment/", _____.as_view(lookup_field="uuid")),
-    path("<int:pk>/comment/", _____.as_view()),
+    path("<uuid:uuid>/comment/", CommentListView.as_view(lookup_field="uuid")),
+    path("<int:pk>/comment/", CommentListView.as_view()),
 ]

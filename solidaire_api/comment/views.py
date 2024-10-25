@@ -8,8 +8,69 @@ from rest_framework.mixins import (
     UpdateModelMixin,
 )
 from .querysets import ALL_COMMENTS_QUERYSET
-from .serializers import CommentSerializer, CreateCommentSerializer
-
+from .serializers import CommentSerializer, CommentCreateSerializer
 from solidaire_api.permissions import AllowAny, IsAuthenticated, IsCommentOrPostOwner
 from solidaire_content.models import Comment
 from solidaire_api.exceptions import BadRequest
+
+class CommentAPIView(GenericAPIView):
+    queryset = ALL_COMMENTS_QUERYSET
+    serializer_class = CommentSerializer
+    permission_classes = [AllowAny]
+    ordering_fields = ["created_at"]
+    ordering = ["-created_at"]
+    
+    
+class CommentListView(ListModelMixin, CommentAPIView):
+    def get(self, request, *args, **kwargs):
+        if kwargs.get("uuid"):
+            self.queryset = ALL_COMMENTS_QUERYSET.filter(
+                post__uuid=kwargs.get("uuid")
+            )
+        elif kwargs.get("pk"):
+            self.queryset = ALL_COMMENTS_QUERYSET.filter(
+                post__id=kwargs.get("pk")
+            )
+        else:
+            raise BadRequest()
+        
+        return self.list(request, *args, **kwargs)
+        
+        
+class CommentCreateView(CommentAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommentCreateSerializer
+    
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        owner = serializer.validated_data.get("owner")
+        post = serializer.validated_data.get("post")
+        body = serializer.validated_data.get("body")
+        comment = Comment.objects.create(
+            owner=owner,
+            post=post,
+            body=body,
+        )
+        
+        return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+    
+
+class CommentRetriveUpdateDestroyView(RetrieveModelMixin, DestroyModelMixin, CommentAPIView):
+    
+    permission_classes = [IsCommentOrPostOwner]
+    
+    def get_permissions(self):
+        if self.request.method == "DELETE":
+            self.permission_classes = [IsCommentOrPostOwner]
+        return super().get_permissions()
+    
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+    
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+    
+    def perform_destroy(self, instance: Comment):
+        instance.is_deleted = True
+        instance.save()
